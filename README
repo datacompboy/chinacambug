@@ -1,0 +1,14 @@
+Simple client, that triggers TCP stream broke bug.
+
+Run it against cam. 
+Whel sleep() executed, TCP receive window get overloaded, and TCP stream put on pause.
+On server (camera) side, at that point one of send() system call on stream returns less bytes sent, that was requested.
+
+Correct (expected) behaviour:
+  - some of stream must be buffered on camera side (as much, as free RAM available)
+  - once camera get out of free RAM for buffering -- TCP connection MUST be dropped
+
+Actual behaviour:
+  - non-sent data lost (result of send() call are ignored)
+  as result -- stream get broken.
+
