@@ -2,27 +2,36 @@
 import socket
 import time
 import random
+import re
 
-host = '172.28.1.91'
+#host = '172.28.1.91'
+#url = '/mpeg4/track1' # 90 91 95
 
-def ping(s, host, sess, cseq):
-    pingmsg = "GET_PARAMETER rtsp://"+host+"/mpeg4/track1 RTSP/1.0\r\n CSeq: "+str(cseq)+"\r\n"+sess+"\r\n"
+host = '172.28.1.94'
+url = '/user=admin&password=admink&channel=1&stream=0.sdp?real_stream' # 92 93 94
+
+def ping(s, sess, cseq):
+    pingmsg = "GET_PARAMETER rtsp://"+host+url+" RTSP/1.0\r\n CSeq: "+str(cseq)+"\r\n"+sess+"\r\n"
     s.send(pingmsg, 0)
     return cseq+1
 
-def connect(host, port=554):
-    setupmsg = "SETUP rtsp://"+host+"/mpeg4/track1 RTSP/1.0\r\nCSeq: 1\r\nTransport: RTP/AVP/TCP;unicast\r\n"
-    playmsg = "PLAY rtsp://"+host+"/mpeg4/ RTSP/1.0\r\nCSeq: 2\r\nRange: npt=0.000-"
+def connect(port=554):
+    setupmsg = "SETUP rtsp://"+host+url+" RTSP/1.0\r\nCSeq: 1\r\nTransport: RTP/AVP/TCP;unicast\r\n"
+    playmsg = "PLAY rtsp://"+host+url+" RTSP/1.0\r\nCSeq: 2\r\nRange: npt=0.000-\r\n"
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 128*1024)
     #s.setsockopt(socket.SOL_SOCKET, socket.TCP_WINDOW_CLAMP, 16*512*1024)
     s.connect((host, port))
     s.send(setupmsg+"\r\n")
+    print setupmsg
     res = s.recv(1500)
-    sess = res.split("\r\n")[-2]+"\r\n"
+    print res
+    sess = re.search("\r\n(Session:.*?)(?:;|\r\n)", res).group(1)+"\r\n"
     s.send(playmsg+sess+"\r\n", 0)
+    print playmsg+sess
     res = s.recv(1500)
     pos = res.find("\r\n\r\n")
+    print res
     if pos>-1:
         res = res[pos+4:]
     else:
@@ -37,7 +46,7 @@ q=1
 sl=0
 sll=0
 st=1
-s,buf,sess,cseq=connect(host)
+s,buf,sess,cseq=connect()
 prev=None
 loss=0
 start = time.time()
@@ -46,7 +55,7 @@ while True:
   d = time.time()-start
   if (round(d*10)%3)==0:
     if k==0:
-      cseq=ping(s, host, sess, cseq)
+      cseq=ping(s, sess, cseq)
       print "RTP ", d, rtp, rtpl, rtp/d, rtpl/d, "last", prev, "loss", loss, loss/st
       loss=0
       k=1
@@ -106,7 +115,7 @@ while True:
     print Exception("Garbage 2 "+str(sll)+" loss="+str(loss))
     # try to resync
     if False:
-        s,buf=connect(host)
+        s,buf=connect()
     else:
         sync = -1
         last = 0
